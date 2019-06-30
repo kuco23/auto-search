@@ -1,22 +1,21 @@
-import os
-import os
 from unicodedata import normalize
 from math import inf
-import re
-import argparse
+from getpass import getpass
+import os, argparse, re
 from bs4 import BeautifulSoup
-from microlib import safeget
+from microlib import safeget, log
 
 PIRATE_BAY = 'https://thepiratebay3.org'
 UNIT2NUM = {'MiB' : 1, 'GiB' : 10**3} # std unit is MiB
+LOG_FILE = 'magnetlog.txt'
 
 # set the terminal argument parser
 args = argparse.ArgumentParser(description='torrent specs')
-args.add_argument('tname', metavar='torrent name', type=str)
+args.add_argument('tname', metavar='torrent_name', type=str)
 args.add_argument('-msd', metavar='minseeds', type=int, default=0)
 args.add_argument('-mlc', metavar='minleachs', type=int, default=0)
-args.add_argument('-msz', metavar='minsize in MiB', type=int, default=0)
-args.add_argument('-xsz', metavar='maxsize in MiB', type=int, default=inf)
+args.add_argument('-msz', metavar='minsize_MiB', type=int, default=0)
+args.add_argument('-xsz', metavar='maxsize_MiB', type=int, default=inf)
 vals = args.parse_args()
 
 # get the page containing torrents
@@ -38,4 +37,6 @@ for torrent in torrents:
        vals.msz <= size <= vals.xsz:
         magnet = torrent.select_one('td:nth-child(2) > a').attrs['href']
         os.system('start ' + magnet)
-        if input('continue? y/n: ') == 'n': break
+        if input('ok? y/n: ') == 'y':
+            log(magnet, 'magnet.log')
+            break
