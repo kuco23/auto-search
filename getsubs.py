@@ -1,6 +1,5 @@
-import os
 from io import BytesIO
-import argparse
+import os, argparse
 from zipfile import ZipFile
 from urllib.parse import urlsplit, parse_qs
 from bs4 import BeautifulSoup

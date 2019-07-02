@@ -1,13 +1,12 @@
 from unicodedata import normalize
 from math import inf
-from getpass import getpass
 import os, argparse, re
 from bs4 import BeautifulSoup
 from microlib import safeget, log
 
 PIRATE_BAY = 'https://thepiratebay3.org'
 UNIT2NUM = {'MiB' : 1, 'GiB' : 10**3} # std unit is MiB
-LOG_FILE = 'magnetlog.txt'
+LOG_FILE = 'magnet.log'
 
 # set the terminal argument parser
 args = argparse.ArgumentParser(description='torrent specs')
@@ -38,5 +37,5 @@ for torrent in torrents:
         magnet = torrent.select_one('td:nth-child(2) > a').attrs['href']
         os.system('start ' + magnet)
         if input('ok? y/n: ') == 'y':
-            log(magnet, 'magnet.log')
+            log(magnet, LOG_FILE)
             break
