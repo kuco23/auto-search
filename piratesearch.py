@@ -1,5 +1,5 @@
-from unicodedata import normalize
 from math import inf
+from unicodedata import normalize
 import os, argparse, re
 from bs4 import BeautifulSoup
 from microlib import safeget, log
@@ -41,12 +41,14 @@ for torrent in torrents:
        vals.msz <= size <= vals.xsz:
         name = torrent.select_one('div.detName > a').text
         magnet = torrent.select_one('td:nth-child(2) > a').attrs['href']
-        magnets.append(magnet)
-        print(len(magnets)-1,
-              name, seeds, leachs, str(size) + ' MiB',
-              sep=' :: ')
+        magnets.append((magnet, name, seeds, leachs, size))
+
+# print the available torrent data
+for i, data in enumerate(magnets):
+    try: print(i, *data[1:], sep=' || ')
+    except Exception: continue
 
 # ask user for magnet link index
 idx = int(input('get magnet <index>: '))
-os.system('start ' + magnets[idx])
-log(magnets[idx], LOG_FILE)
+os.system('start ' + magnets[idx][0])
+log(magnets[idx][0], LOG_FILE)
