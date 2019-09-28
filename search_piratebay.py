@@ -1,7 +1,10 @@
 from math import inf
 from unicodedata import normalize
 import os, argparse, re
+
 from bs4 import BeautifulSoup
+from pandas import DataFrame
+
 from microlib import safeget, log
 
 TORRENT_TYPES = ('audio', 'video', 'applications', 'games', 'porn')
@@ -26,7 +29,7 @@ query_page = safeget(url, params = payload)
 assert query_page, 'Pirate Bay Response Not Valid'
 
 # filter the data to find an acceptable torrents (magnet links)
-magnets = []
+magnets, torrent_data = [], []
 szrgx = re.compile(r'Size (?P<size>[\d\.]+) (?P<unit>KiB|MiB|GiB)')
 soup = BeautifulSoup(query_page.content, 'html.parser')
 torrents = soup.select('#searchResult tr')
@@ -40,17 +43,17 @@ for torrent in torrents:
     if seeds >= vals.msd and leachs >= vals.mlc and \
        vals.msz <= size <= vals.xsz:
         name = torrent.select_one('div.detName > a').text
+        torrent_data.append((name, seeds, leachs, size))
         magnet = torrent.select_one('td:nth-child(2) > a').attrs['href']
-        magnets.append((magnet, name, seeds, leachs, size))
+        magnets.append(magnet)
 
 # print the available torrent data
-for i, data in enumerate(magnets):
-    try: print(f' \033[95m{i}\033[0m ', *data[1:], sep=' \033[92m||\033[0m ')
-    except Exception: continue
+cols = ('name', 'seeds', 'leachs', 'size')
+print(DataFrame(torrent_data, columns=cols))
 
 # ask user for magnet link index
 try: idx = int(input('get magnet <index>: '))
 except ValueError: exit()
 if 0 <= idx < len(magnets):
-    os.system('start ' + magnets[idx][0])
-    log(magnets[idx][0], LOG_FILE)
+    os.system('start ' + magnets[idx])
+    log(magnets[idx], LOG_FILE)
