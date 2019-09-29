@@ -7,3 +7,8 @@ who lost his mind dealing with pirate bay's popup ads.
 I myself ofcourse do not participate in any of the illegal 
 activities promoted by the pirate bay users and have 
 gotten all the information from my friends and family.
+
+Script search_piratebay can be used from the os terminal 
+as "python search_piratebay.py <torrent name>".
+For info about the keyword arguments try
+"python search_piratebay.py -h".
