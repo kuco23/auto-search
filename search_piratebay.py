@@ -20,7 +20,7 @@ args.add_argument('-xsz', metavar='maxsize_MiB', type=int, default=inf)
 vals = args.parse_args()
 
 # get the page containing torrents
-url = 'https://thepiratebay3.org/index.php'
+url = 'https://thepiratebay3.to/s/'
 payload = {'q': vals.tname, **{typ: 'on' for typ in vals.typ}}
 query_page = safeget(url, params = payload)
 assert query_page, 'Pirate Bay Response Not Valid'
