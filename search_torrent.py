@@ -1,15 +1,18 @@
-import re
 from math import inf
-from collections import namedtuple
+from operator import setitem
 from unicodedata import normalize
+from collections import namedtuple
+from abc import ABC
+import re
 
 from bs4 import BeautifulSoup
 
 from microlib import safeget
 
 piratebay = 'https://www.thepiratebay3.to/s/'
+kickasstorrents = 'https://kickasstorrents.to/search/'
 
-Torrent = namedtuple('str', [
+Torrent = namedtuple('Torrent', [
     'name',
     'seeds',
     'leachs',
@@ -19,7 +22,38 @@ Torrent = namedtuple('str', [
     'magnet'
 ])
 
-class PirateBay:
+
+class TorrentBase(ABC):
+
+    @classmethod
+    def _getTorrentBase(cls, tor_div, tor_pt):
+        pattern = getattr(cls, tor_pt)
+        attr = tor_div.select_one(pattern)
+        return attr.text if attr else None
+
+    @classmethod
+    def _getTorrentData(cls, tor_div):
+        return Torrent(*map(
+            lambda attr: getattr(
+                cls, '_getTorrent' + attr.capitalize()
+            )(cls, tor_div),
+            Torrent._fields
+        ))
+
+    for attr in Torrent._fields:
+        setitem(locals(), '_tor_pt_' + attr, '')
+        setitem(
+            locals(),
+            '_getTorrent' + attr.capitalize(),
+            lambda cls, div, attr=attr: cls._getTorrentBase(
+                div, '_tor_pt_' + attr
+            )
+        )
+
+    locals().pop('attr')
+
+
+class PirateBay(TorrentBase):
     _types = (
         'audio',
         'video',
@@ -27,15 +61,15 @@ class PirateBay:
         'games',
         'porn'
     )
-    _tor_pages_pt = 'div[align=center] > a'
-    _tor_div_pt = '#searchResult tr'
-    _tor_name_pt = 'div.detName > a'
-    _tor_seeds_pt = 'td[align=right]:nth-child(3)'
-    _tor_leachs_pt = 'td[align=right]:nth-child(4)'
-    _tor_specs_pt = 'font.detDesc'
-    _tor_type_pt = 'td.vertTh center a:first-child'
-    _tor_uploader_pt = 'font.detDesc > a'
-    _tor_magnet_pt = 'td > a:nth-child(2)'
+    _tor_pt_pagesn = 'div[align=center] > a'
+    _tor_pt_divs = '#searchResult tr'
+    _tor_pt_name = 'div.detName > a'
+    _tor_pt_seeds = 'td[align=right]:nth-child(3)'
+    _tor_pt_leachs = 'td[align=right]:nth-child(4)'
+    _tor_pt_size = 'font.detDesc'
+    _tor_pt_type = 'td.vertTh center a:first-child'
+    _tor_pt_uploader = 'font.detDesc > a'
+    _tor_pt_magnet = 'td > a:nth-child(2)'
     _size_rgx = re.compile(
         r'Size (?P<size>[\d\.]+) (?P<unit>\w+)'
     )
@@ -47,70 +81,35 @@ class PirateBay:
 
     def __iter__(self):
         yield from self._scrapeiter()
-        
 
     def _getPayload(self, page):
         nm, tps = self.torrent_name, self.types
         tp_params = {tp: 'on' for tp in tps}
         return {'q': nm, 'page': page, **tp_params}
-    
 
     def _setResultSoup(self, page):
         payload = self._getPayload(page)
         resp = safeget(piratebay, params=payload)
         assert resp, 'Pirate Bay response invalid'
         self._soup = BeautifulSoup(resp.content, 'html.parser')
-        
 
     def _getPagesNumber(self):
-        return len(self._soup.select(self._tor_pages_pt))
+        return len(self._soup.select(self._tor_pt_pagesn))
 
     def _getTorrentDivs(self):
-        return self._soup.select(self._tor_div_pt)
-
-    def _getTorrentName(self, torrent_div):
-        name = torrent_div.select_one(self._tor_name_pt)
-        return name.text if name else None
-    
-    def _getTorrentSeeds(self, torrent_div):
-        seeds = torrent_div.select_one(self._tor_seeds_pt)
-        return seeds.text if seeds else None
-    
-    def _getTorrentLeachs(self, torrent_div):
-        leachs = torrent_div.select_one(self._tor_leachs_pt)
-        return leachs.text if leachs else None
-
-    def _getTorrentType(self, torrent_div):
-        tp = torrent_div.select_one(self._tor_type_pt)
-        return tp.text if tp else None
-
-    def _getTorrentUploader(self, torrent_div):
-        uploader = torrent_div.select_one(self._tor_uploader_pt)
-        return uploader.text if uploader else None
+        return self._soup.select(self._tor_pt_divs)
 
     def _getTorrentMagnet(self, torrent_div):
-        magnet = torrent_div.select_one(self._tor_magnet_pt)
+        magnet = torrent_div.select_one(self._tor_pt_magnet)
         return magnet.attrs.get('href') if magnet else None
 
     def _getTorrentSize(self, torrent_div):
-        specs = torrent_div.select_one(self._tor_specs_pt)
+        specs = torrent_div.select_one(self._tor_pt_size)
         if specs:
             text = normalize('NFKD', specs.text)
             match = self._size_rgx.search(text)
             s, u = match.group('size'), match.group('unit')
-            return s + u if s and u else None
-
-    def _getTorrentData(self, torrent_div):
-        return Torrent(
-            self._getTorrentName(torrent_div),
-            self._getTorrentSeeds(torrent_div),
-            self._getTorrentLeachs(torrent_div),
-            self._getTorrentSize(torrent_div),
-            self._getTorrentType(torrent_div),
-            self._getTorrentUploader(torrent_div),
-            self._getTorrentMagnet(torrent_div)
-        )
-
+            return f'{s} {u}' if s and u else None
 
     def _scrapeiter(self):
         self._setResultSoup(0)
@@ -122,6 +121,48 @@ class PirateBay:
                 if any(tor_data): yield tor_data
 
 
+class KickassTorrents(TorrentBase):
+    _types = []
+    _tor_pt_pagesn = 'div.pages a:last-child'
+    _tor_pt_divs = 'table.data > tbody > tr'
+    _tor_pt_name = 'a.cellMainLink'
+    _tor_pt_seeds = 'td:nth-child(5)'
+    _tor_pt_leachs = 'td:nth-child(6)'
+    _tor_pt_size = 'td:nth-child(2)'
+    _tor_pt_type = 'div.torrentname span > a:first-child'
+    _tor_pt_uploader = 'td:nth-child(3)'
+    _tor_pt_magnet = ''
+
+    def __init__(self, torrent_name):
+        self.torrent_name = torrent_name
+        self._soup = None
+
+    def _getUrl(self, page):
+        kat, tor = kickasstorrents, self.torrent_name
+        return kat + f'/{tor}/{page}'
+
+    def _getTorrentDivs(self):
+        return self._soup.select(self._tor_pt_divs)
+
+    def _getPagesNumber(self):
+        npages = self._soup.select_one(self._tor_pt_pagesn)
+        return npages.text if npages else None
+        
+    def _setResultSoup(self, page):
+        kat_url = self._getUrl(page)
+        resp = safeget(kat_url)
+        assert resp, 'KickassTorrents response invalid'
+        self._soup = BeautifulSoup(resp.content, 'html.parser')
+
+    def _scrapeiter(self):
+        self._setResultSoup(0)
+        npages = self._getPagesNumber()
+        for i in range(1, 4):
+            self._setResultSoup(i)
+            for div in self._getTorrentDivs():
+                tor_data = self._getTorrentData(div)
+                if any(tor_data): yield tor_data
+
 if __name__ == '__main__':
-    a = PirateBay('scott pilgrim')
+    a = PirateBay('inception')
     print(next(iter(a)))
